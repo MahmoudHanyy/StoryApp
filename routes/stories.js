@@ -3,6 +3,7 @@ const router = express.Router()
 const { ensureAuth } = require('../middleware/auth')
 
 const Story = require('../models/Story')
+const User = require('../models/User')
 
 // @desc    Show add page
 // @route   GET /stories/add
@@ -54,6 +55,12 @@ router.get('/:id', ensureAuth, async (req, res) => {
     if (story.user._id != req.user.id && story.status == 'private') {
       res.render('error/404')
     } else {
+      await Story.updateOne({ _id: req.params.id }, {
+        viewsCount: story.viewsCount? story.viewsCount + 1 : 1
+      });
+      await User.updateOne({ _id: story.user._id }, {
+        viewsCount: story.user.viewsCount? story.user.viewsCount + 1 : 1
+      });
       res.render('stories/show', {
         story,
       })
