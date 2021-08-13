@@ -4,6 +4,7 @@ const { ensureAuth } = require('../middleware/auth')
 
 const Story = require('../models/Story')
 const User = require('../models/User')
+const UserStory = require('../models/UserStory')
 
 // @desc    Show add page
 // @route   GET /stories/add
@@ -46,6 +47,7 @@ router.get('/', ensureAuth, async (req, res) => {
 // @route   GET /stories/:id
 router.get('/:id', ensureAuth, async (req, res) => {
   try {
+    let currentUser = await User.findById(req.session.passport.user).lean()
     let story = await Story.findById(req.params.id).populate('user').lean()
 
     if (!story) {
@@ -55,12 +57,22 @@ router.get('/:id', ensureAuth, async (req, res) => {
     if (story.user._id != req.user.id && story.status == 'private') {
       res.render('error/404')
     } else {
-      await Story.updateOne({ _id: req.params.id }, {
-        viewsCount: story.viewsCount? story.viewsCount + 1 : 1
-      });
-      await User.updateOne({ _id: story.user._id }, {
-        viewsCount: story.user.viewsCount? story.user.viewsCount + 1 : 1
-      });
+
+      let userStory = await UserStory.findOne({user: currentUser, story: story}).lean()
+      
+      if( (JSON.stringify(currentUser._id) !=  JSON.stringify(story.user._id))  && !userStory) {
+        await Story.updateOne({ _id: req.params.id }, {
+          viewsCount: story.viewsCount? story.viewsCount + 1 : 1
+        });
+        await User.updateOne({ _id: story.user._id }, {
+          viewsCount: story.user.viewsCount? story.user.viewsCount + 1 : 1
+        });
+        if(! userStory)
+          await UserStory.create({
+            user: currentUser,
+            story: story
+          }) 
+      }
       res.render('stories/show', {
         story,
       })
